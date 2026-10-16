@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adjustable Work Tracker</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f4f9; margin: 0; padding: 16px; color: #333; }
+        h2 { text-align: center; font-size: 1.2rem; margin-bottom: 5px; }
+        .goal-container { text-align: center; margin-bottom: 15px; }
+        .goal-container label { font-weight: bold; font-size: 0.9rem; margin-right: 5px; }
+        .goal-input { width: 60px; padding: 4px; text-align: center; font-size: 1rem; border: 1px solid #ccc; border-radius: 4px; }
+        .day-card { background: #fff; padding: 12px; margin-bottom: 10px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .day-card h3 { margin: 0 0 8px 0; font-size: 1rem; color: #0056b3; }
+        label { display: block; font-size: 0.8rem; color: #666; margin-top: 4px; }
+        input { width: 100%; padding: 8px; margin-top: 2px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
+        .summary { background: #0056b3; color: white; padding: 16px; border-radius: 8px; text-align: center; margin-top: 20px; }
+        .summary h3 { margin: 0 0 8px 0; }
+    </style>
+</head>
+<body>
+
+    <h2>5-Day Work Tracker</h2>
+    <div class="goal-container">
+        <label for="weekly-goal">Weekly Goal (hrs):</label>
+        <input type="number" id="weekly-goal" class="goal-input" value="48" min="1" max="168">
+    </div>
+    
+    <div id="days-container"></div>
+
+    <div class="summary">
+        <h3 id="total-worked">Total Worked: 0 hrs 0 mins</h3>
+        <h3 id="hours-remaining">Remaining: 48 hrs 0 mins</h3>
+    </div>
+
+    <script>
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        const container = document.getElementById('days-container');
+
+        days.forEach(day => {
+            const card = document.createElement('div');
+            card.className = 'day-card';
+            card.innerHTML = `
+                <h3>${day}</h3>
+                <label>Shift Start</label><input type="time" class="start" data-day="${day}">
+                <label>Meal Start</label><input type="time" class="bstart" data-day="${day}">
+                <label>Meal End</label><input type="time" class="bend" data-day="${day}">
+                <label>Shift End</label><input type="time" class="end" data-day="${day}">
+            `;
+            container.appendChild(card);
+        });
+
+        const goalInput = document.getElementById('weekly-goal');
+        goalInput.value = localStorage.getItem('weekly_goal') || '48';
+        goalInput.addEventListener('input', updateCalc);
+
+        const inputs = document.querySelectorAll('#days-container input');
+        inputs.forEach(input => {
+            const day = input.dataset.day;
+            const type = input.className;
+            input.value = localStorage.getItem(`${day}_${type}`) || '';
+            input.addEventListener('input', updateCalc);
+        });
+
+        function timeToHours(timeStr) {
+            if (!timeStr) return 0;
+            const [h, m] = timeStr.split(':').map(Number);
+            return h + m / 60;
+        }
+
+        function formatHoursAndMinutes(decimalHours) {
+            const totalMinutes = Math.round(decimalHours * 60);
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            return `${hours} hrs ${minutes} mins`;
+        }
+
+        function updateCalc() {
+            let totalWorked = 0;
+            const currentGoal = parseFloat(goalInput.value) || 0;
+            localStorage.setItem('weekly_goal', goalInput.value);
+
+            days.forEach(day => {
+                const start = document.querySelector(`.start[data-day="${day}"]`).value;
+                const bstart = document.querySelector(`.bstart[data-day="${day}"]`).value;
+                const bend = document.querySelector(`.bend[data-day="${day}"]`).value;
+                const end = document.querySelector(`.end[data-day="${day}"]`).value;
+
+                localStorage.setItem(`${day}_start`, start);
+                localStorage.setItem(`${day}_bstart`, bstart);
+                localStorage.setItem(`${day}_bend`, bend);
+                localStorage.setItem(`${day}_end`, end);
+
+                let shiftHrs = timeToHours(end) - timeToHours(start);
+                if (shiftHrs < 0) shiftHrs += 24; 
+                
+                let breakHrs = timeToHours(bend) - timeToHours(bstart);
+                if (breakHrs < 0) breakHrs = 0;
+
+                const net = Math.max(0, shiftHrs - breakHrs);
+                totalWorked += net;
+            });
+
+            document.getElementById('total-worked').innerText = `Total Worked: ${formatHoursAndMinutes(totalWorked)}`;
+            const remaining = Math.max(0, currentGoal - totalWorked);
+            document.getElementById('hours-remaining').innerText = `Remaining for ${currentGoal}h: ${formatHoursAndMinutes(remaining)}`;
+        }
+
+        updateCalc();
+    </script>
+</body>
+</html>
